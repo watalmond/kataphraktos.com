@@ -1,0 +1,332 @@
+/* Layout and palette follow the Grim Dawn item database on grimtools:
+   a dark card wall with a fixed search bar on top and a tab strip under it. */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-page:      #1c1d1f;
+  --bg-panel:     #12110f;
+  --bg-bar:       #171614;
+  --bg-card:      #171614;
+  --border-card:  #211e1c;
+  --border-soft:  #2b251b;
+  --border-tab:   #332f2c;
+
+  --text:         #f7f7f7;
+  --text-dim:     #999;
+  --text-heading: #dec2a3;   /* category headers, stat text */
+  --text-desc:    #bfb08c;   /* flavour text */
+  --text-skill:   #69f;      /* skill names */
+  --text-brown:   #a88054;   /* section headings inside a card */
+
+  --font: 'Linux Biolinum O', 'Linux Biolinum', Candara, Optima, 'Segoe UI', system-ui, sans-serif;
+}
+
+html { color-scheme: dark; }
+
+body {
+  background: var(--bg-page);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-thumb { background: #404040; border: 3px solid transparent; border-radius: 2px; background-clip: content-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------------------------------------------------------------- header -- */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 16px 10px;
+}
+.logo { text-align: center; }
+.logo-text {
+  color: #808080;
+  font-size: 22px;
+  text-shadow: 0 0 6px #000, 0 0 6px #000;
+  white-space: nowrap;
+}
+.mod-info { margin-top: 4px; display: flex; justify-content: center; }
+.mod-name, .mod-version {
+  font-size: 13px; padding: 0 5px; border: 1px solid #8c8c8c; color: #000;
+}
+.mod-name { background: #8c8c8c; }
+.mod-version { background: #bbb; }
+
+/* ------------------------------------------------------------- container -- */
+
+.main-container {
+  position: relative;
+  max-width: 1500px;
+  margin: 0 auto;
+  background: var(--bg-panel);
+  border: 1px solid #1c1a18;
+  border-radius: 2px;
+  box-shadow: 0 0 4px 1px rgba(0, 0, 0, .75);
+  min-height: 60vh;
+}
+
+/* ------------------------------------------------------------- top bars --- */
+
+.top-bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: 48px;
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  background: var(--bg-bar);
+  box-shadow: 0 0 4px 2px rgba(10, 10, 10, .5);
+}
+.top-bar .bar-mid { flex: 1 1 auto; display: flex; }
+.top-bar .bar-right { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; }
+
+.top-bar.secondary {
+  top: 48px;
+  z-index: 40;
+  height: 56px;
+  background: var(--bg-panel);
+  box-shadow: none;
+  border-bottom: 1px solid #1c1a18;
+}
+
+/* search ------------------------------------------------------------------ */
+
+.input-block { position: relative; width: 100%; max-width: 640px; }
+.input.search {
+  width: 100%;
+  height: 28px;
+  padding: 0 26px;
+  background: #0b0b0a;
+  border: 1px solid var(--border-tab);
+  border-radius: 2px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  outline: none;
+  cursor: text;
+}
+.input.search:focus { border-color: #4a443e; box-shadow: 0 0 3px 1px rgba(0,0,0,.6) inset; }
+.input.search::placeholder { color: #666; }
+
+.search-icon { position: absolute; left: 5px; top: 5px; width: 18px; height: 18px; pointer-events: none; }
+.search-icon svg { width: 18px; height: 18px; fill: #808080; }
+
+.search-clear {
+  position: absolute; right: 5px; top: 5px; width: 18px; height: 18px;
+  display: none; cursor: pointer;
+  background: no-repeat center/contain
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%239C9C90' d='m8.4 17l3.6-3.6l3.6 3.6l1.4-1.4l-3.6-3.6L17 8.4L15.6 7L12 10.6L8.4 7L7 8.4l3.6 3.6L7 15.6zm3.6 5q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22'/%3E%3C/svg%3E");
+}
+.input-block.has-text .search-clear { display: block; }
+.search-clear:hover { filter: brightness(1.3); }
+
+/* tab strips -------------------------------------------------------------- */
+
+.class-selector, .rank-mode {
+  display: flex;
+  border: 1px solid var(--border-tab);
+  border-radius: 2px;
+  box-shadow: 0 1px 2px 1px rgba(0, 0, 0, .75);
+  cursor: pointer;
+  user-select: none;
+}
+.class-selector { margin: 12px 12px; }
+
+.class-selector .tab, .rank-mode .tab {
+  padding: 6px 15px;
+  background: #000;
+  border-right: 1px solid var(--border-tab);
+  white-space: nowrap;
+  text-align: center;
+  color: var(--text);
+}
+.class-selector .tab:last-child, .rank-mode .tab:last-child { border-right: 0; }
+.class-selector .tab:not(.selected), .rank-mode .tab:not(.selected) { color: #666; }
+.class-selector .tab.selected, .rank-mode .tab.selected { background: #191816; }
+.class-selector .tab:hover, .rank-mode .tab:hover { background: #0f0d0c; }
+.rank-mode .tab { padding: 4px 12px; font-size: 15px; }
+
+/* ------------------------------------------------------------- skill list -- */
+
+.skill-list { padding-bottom: 24px; }
+
+.skill-list-group-header {
+  margin: 12px 24px 0;
+  padding: 10px 0 6px;
+  color: var(--text-heading);
+  font-size: 20px;
+  border-bottom: 1px solid var(--border-soft);
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.skill-list-group-header .count { color: #7d6b55; font-size: 15px; }
+
+.skill-list-group {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: flex-start;
+  padding: 8px 16px;
+}
+
+.no-results { color: var(--text-dim); padding: 32px 24px; }
+
+/* ------------------------------------------------------------- skill card -- */
+
+.skill-card {
+  width: 350px;
+  margin: 6px;
+  padding: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  box-shadow: 0 0 4px 0 rgba(0, 0, 0, .75);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+.skill-card.is-transmuter { background: #14161a; border-color: #1d2129; }
+.skill-card.is-exclusive  { background: #191410; border-color: #2a2019; }
+
+.skill-card-head { display: flex; align-items: flex-start; gap: 12px; }
+
+.skill-bitmap-container {
+  flex: 0 0 auto;
+  width: 52px; height: 52px;
+  display: flex; align-items: center; justify-content: center;
+  background: #0c0c0b;
+  border: 1px solid #26221f;
+}
+.skill-bitmap { width: 44px; height: 44px; image-rendering: auto; }
+.skill-card.is-passive .skill-bitmap-container,
+.skill-card.is-transmuter .skill-bitmap-container { border-radius: 999px; }
+
+.skill-head-text { flex: 1 1 auto; min-width: 0; }
+.skill-name {
+  color: var(--text-skill);
+  font-size: 18px;
+  text-shadow: #000 0 0 1px;
+}
+.skill-subtitle { color: var(--text-heading); font-size: 14px; padding-top: 1px; }
+.skill-subtitle .skill-ref { color: var(--text-skill); }
+.skill-req { color: var(--text-dim); font-size: 14px; padding-top: 2px; }
+
+/* rank stepper ------------------------------------------------------------ */
+
+.skill-rank {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 8px; padding-top: 6px;
+  border-top: 1px solid rgba(43, 37, 27, .6);
+}
+.rank-btn {
+  width: 20px; height: 20px; line-height: 1;
+  background: #000; color: #b3b3b3;
+  border: 1px solid var(--border-tab); border-radius: 2px;
+  font-family: var(--font); font-size: 15px; cursor: pointer;
+}
+.rank-btn:hover:not(:disabled) { background: #221f1c; color: #fff; }
+.rank-btn:disabled { opacity: .35; cursor: default; }
+.rank-value { color: #f0e68c; font-size: 15px; min-width: 62px; }
+.rank-value .over-cap { color: #10ea5d; }
+.rank-slider { flex: 1 1 auto; height: 16px; cursor: pointer; accent-color: #7d6b55; }
+
+/* stat lines -------------------------------------------------------------- */
+
+.tooltip-skill-params {
+  margin-top: 6px;
+  color: var(--text-heading);
+  font-size: 15px;
+}
+.tooltip-skill-params .stat-row { line-height: 20px; }
+.tooltip-skill-params .stat-row.indent { padding-left: 16px; }
+
+.skill-description-text {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(43, 37, 27, .6);
+  color: var(--text-desc);
+  font-size: 14px;
+}
+
+/* pet block ---------------------------------------------------------------- */
+
+.tooltip-pet-params {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(43, 37, 27, .6);
+  color: var(--text-heading);
+  font-size: 15px;
+}
+.tooltip-pet-params .stat-row { line-height: 20px; }
+.tooltip-pet-params .stat-row.indent { padding-left: 14px; }
+.tooltip-pet-params .stat-row.indent2 { padding-left: 28px; }
+
+.pet-heading { color: var(--text-brown, #a88054); padding-top: 4px; }
+.pet-heading:first-child { padding-top: 0; }
+
+/* which roll a variant block belongs to, for summons with several spawn pools */
+.pet-variant {
+  color: #f0e68c;
+  margin-top: 8px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(43, 37, 27, .6);
+}
+.pet-variant:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+
+.pet-ability {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 0 1px 14px;
+  color: var(--text-skill);
+}
+.pet-ability-icon { width: 20px; height: 20px; flex: 0 0 auto; }
+
+/* character level input ---------------------------------------------------- */
+
+.char-level { display: flex; align-items: center; gap: 6px; color: #666; font-size: 15px; }
+.char-level input {
+  width: 54px; height: 26px; padding: 0 4px;
+  background: #000; color: var(--text);
+  border: 1px solid var(--border-tab); border-radius: 2px;
+  font-family: var(--font); font-size: 15px; text-align: center;
+}
+.char-level input:focus { outline: none; border-color: #4a443e; }
+
+/* Grim Dawn's inline colour codes */
+.c-e { color: #dec2a3; }
+.c-h { color: #fff; }
+.c-s { color: #fff; }
+.c-z { color: #69f; }
+.c-w { color: #fff; }
+.c-y { color: #fff52b; }
+.c-g { color: #10ea5d; }
+.c-r { color: #ff4200; }
+.c-b { color: #37a5c8; }
+.c-o { color: #a88054; }
+.c-v { color: #b299cc; }
+.c-k { color: #111; }
+.c-missing { color: #ff4200; opacity: .8; }
+
+/* ------------------------------------------------------------------ footer -- */
+
+.footer { padding: 18px 16px 40px; text-align: center; }
+.footer .copy { color: #6b6b6b; font-size: 13px; }
+
+/* ------------------------------------------------------------------ small -- */
+
+@media (max-width: 800px) {
+  .top-bar { gap: 8px; }
+  .top-bar .bar-right { display: none; }
+  .skill-card { width: 100%; margin: 6px 0; }
+  .skill-list-group { padding: 8px 12px; }
+  .skill-list-group-header { margin: 12px 12px 0; }
+}
