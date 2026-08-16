@@ -4,12 +4,18 @@
 
   var F = window.GDFormat;
   var DATA = window.GD_SKILLS;
+  // Each non-mastery source ships as its own global (site/data/<source>.js) so
+  // its .json can be rebuilt/loaded independently of the mastery data.
+  DATA.relics = (window.GD_RELICS && window.GD_RELICS.relics) || [];
+  DATA.components = (window.GD_COMPONENTS && window.GD_COMPONENTS.components) || [];
+  DATA.items = (window.GD_ITEMS && window.GD_ITEMS.items) || [];
 
   var listEl = document.getElementById('skill-list');
   var searchEl = document.getElementById('input-search');
   var searchBlock = document.getElementById('input-block');
   var clearEl = document.getElementById('search-clear');
   var classSelector = document.getElementById('class-selector');
+  var sourceSelector = document.getElementById('source-selector');
   var rankModeEl = document.getElementById('rank-mode');
   var charLevelEl = document.getElementById('char-level');
 
@@ -46,7 +52,10 @@
   }
 
   // Every skill this one hangs off, not just the one the tree parented it to.
+  // Only a mastery skill sits in a tree, so a card with no cls (a relic) has
+  // nothing to reference.
   function referencedSkills(skill, cls) {
+    if (!cls) return [];
     var ids = F.arr(skill.depends);
     if (!ids.length && skill.parent) ids = [skill.parent];
     return ids.map(function (id) { return cls.nameById[id]; }).filter(Boolean);
@@ -55,7 +64,9 @@
   var rankMode = '1';                 // '1' | 'max' | 'ult'
   var charLevel = 100;                // pet health/energy scale off this
   var hiddenClasses = Object.create(null);
-  var cards = [];                     // {el, skill, cls, rank, paramsEl, rankEl, haystack}
+  var hiddenSources = Object.create(null);   // 'mastery' | 'relic' -> hidden?
+  var groups = [];                    // [{id, name, skills, cls, facet, facetId}]
+  var cards = [];                     // {el, skill, cls, group, rank, paramsEl, rankEl, haystack}
 
   // ------------------------------------------------------------- helpers --
 
@@ -72,26 +83,62 @@
     return 1;
   }
 
+  // Which rank of a relic/component/item/set's granted skill is actually
+  // active, per itemSkillLevelEq - independent of the Rank 1/Max/Ultimate
+  // toolbar (that only applies to player-invested mastery ranks), driven by
+  // the char-level box instead since the formula is over character level.
+  function levelEqRank(skill) {
+    var lvl = F.evalEquation(skill.levelEq, charLevel);
+    return Math.max(1, Math.min(skill.levelEqMax || 1, Math.round(lvl || 1)));
+  }
+
   // ---------------------------------------------------------------- card --
 
   function buildCard(skill, cls) {
     var card = el('div', 'skill-card is-' + skill.kind);
 
     var head = el('div', 'skill-card-head');
-    var bmp = el('div', 'skill-bitmap-container');
     if (skill.icon) {
+      var bmp = el('div', 'skill-bitmap-container');
       var img = el('img', 'skill-bitmap');
       img.src = 'icons/' + skill.icon;
       img.alt = '';
       bmp.appendChild(img);
+      head.appendChild(bmp);
     }
-    head.appendChild(bmp);
 
     var text = el('div', 'skill-head-text');
-    text.appendChild(el('div', 'skill-name', F.esc(skill.name)));
+    // itemSkillAutoController skills (most relic/component procs) auto-fire
+    // on a condition - the game appends that right onto the skill's own name,
+    // e.g. "Demon's Breath (15% Chance on Attack)".
+    var procHtml = skill.procTag ? F.render(skill.procTag, [skill.procChance]) : '';
+    text.appendChild(el('div', 'skill-name', F.esc(skill.name) + procHtml));
 
+    // A non-mastery card (relic, component, ...) has no cls, so it names its
+    // source instead - carried on the skill itself as sourceLabel, since
+    // buildCard has no other way to know which non-mastery source a card
+    // belongs to - and names the specific item that grants it (linked to its
+    // grimtools page, when known) so the player knows what to go pick up.
+    var sourceName = cls ? cls.name : (skill.sourceLabel || 'Item');
+    // Some item names carry a leading bare caret code (e.g. "^kSilvercore
+    // Bolts") meant for a game UI context this card doesn't reproduce -
+    // strip it via renderDesc (which understands both the {^X} and bare ^X
+    // forms) rather than showing the raw code or colouring the name.
+    var itemName = skill.itemName ? F.stripTags(F.renderDesc(skill.itemName)) : '';
     var label = kindLabel(skill);
-    var subtitle = F.esc(cls.name) + ' ' + label;
+    var subtitle = F.esc(sourceName) + ' ' + label;
+    if (!cls && itemName) {
+      // Item sets live at grimtools.com/db/itemsets/<id>, everything else at
+      // .../db/items/<id> - grimtoolsKind picks which.
+      var itemLink = skill.grimtoolsId
+        ? '<a class="skill-ref grimtools-link" target="_blank" rel="noopener" href="https://www.grimtools.com/db/' +
+          (skill.grimtoolsKind || 'items') + '/' + skill.grimtoolsId + '">' + F.esc(itemName) + '</a>'
+        : '<span class="skill-ref">' + F.esc(itemName) + '</span>';
+      subtitle += ' Granted by ' + itemLink;
+      // Item sets only turn their skill on once enough pieces are worn -
+      // not always the full set, so this states exactly which threshold.
+      if (skill.setSize) subtitle += ' (' + skill.setThreshold + '/' + skill.setSize + ' pieces)';
+    }
     var affects = referencedSkills(skill, cls);
     if (affects.length) {
       subtitle += ' for ' + joinNames(affects.map(function (n) {
@@ -100,14 +147,20 @@
     }
     text.appendChild(el('div', 'skill-subtitle', subtitle));
 
-    text.appendChild(el('div', 'skill-req',
-      'Requires: ' + F.esc(cls.name) + ' Mastery Level ' + skill.levelReq));
+    if (cls) {
+      text.appendChild(el('div', 'skill-req',
+        'Requires: ' + F.esc(cls.name) + ' Mastery Level ' + skill.levelReq));
+    }
     head.appendChild(text);
     card.appendChild(head);
 
     // rank stepper
     var ult = skill.ultLevel || skill.maxLevel || 1;
-    var rank = Math.min(defaultRank(skill), ult);
+    // A relic/component/item/set skill isn't ranked by player choice, but it
+    // often isn't fixed at 1 either - itemSkillLevelEq (a number, or a
+    // formula over the wearer's character level) picks which rank of the
+    // underlying skill record is actually active. See levelEqRank() below.
+    var rank = skill.levelEq ? levelEqRank(skill) : Math.min(defaultRank(skill), ult);
 
     var rankRow = el('div', 'skill-rank');
     var dec = el('button', 'rank-btn', '&minus;');
@@ -129,7 +182,10 @@
       rankRow.classList.add('fixed');
       rankRow.appendChild(value);
     }
-    card.appendChild(rankRow);
+    // A relic (or any other source with no rank concept at all - no maxLevel
+    // in the data, as opposed to a mastery skill that simply caps at rank 1)
+    // has no rank value worth showing, fixed or otherwise.
+    if (skill.maxLevel != null) card.appendChild(rankRow);
 
     var params = el('div', 'tooltip-skill-params');
     card.appendChild(params);
@@ -163,10 +219,14 @@
 
     // Search matches whatever the card can ever show, not just the current
     // rank, so typing "bleeding" still finds a skill that only bleeds at 5.
-    entry.haystack = (skill.name + ' ' + cls.name + ' ' + (skill.desc || '') + ' ' +
+    entry.haystack = (skill.name + ' ' + sourceName + ' ' + itemName + ' ' +
+      F.stripTags(procHtml) + ' ' + (skill.desc || '') + ' ' +
       kindLabel(skill) + ' ' + referencedSkills(skill, cls).join(' ') + ' ' +
       F.stripTags(lineHtml(skill, 1)) + ' ' +
-      F.stripTags(lineHtml(skill, ult))).toLowerCase();
+      F.stripTags(lineHtml(skill, ult)) + ' ' +
+      // ult is always 1 for a levelEq card (it has no rank stepper), so
+      // neither call above reaches the numbers actually on display.
+      (skill.levelEq ? F.stripTags(lineHtml(skill, rank)) : '')).toLowerCase();
 
     return entry;
   }
@@ -256,25 +316,59 @@
 
   // --------------------------------------------------------------- render --
 
-  function render() {
-    listEl.innerHTML = '';
-    cards = [];
+  // Non-mastery sources, in the order they appear in the source row. A source
+  // only shows up (here and in sourceItems() below) once its data actually
+  // loaded something, so a rebuild that skips a source doesn't leave an empty
+  // tab behind.
+  var ITEM_SOURCES = [
+    { facetId: 'relic', name: 'Relics', dataKey: 'relics' },
+    { facetId: 'component', name: 'Components', dataKey: 'components' },
+    { facetId: 'item', name: 'Items', dataKey: 'items' }
+  ];
 
-    DATA.classes.forEach(function (cls) {
+  // One group per mastery class (facet 'class', filtered by hiddenClasses)
+  // plus one group per non-mastery source (facet 'source', filtered by
+  // hiddenSources) - e.g. Relics, Components. Every group behind the 'class'
+  // facet is also gated by the 'mastery' entry in hiddenSources, so switching
+  // Masteries off in the source row hides all ten class groups at once.
+  function buildGroups() {
+    var list = DATA.classes.map(function (cls) {
       // so a modifier can name the skill it hangs off
       cls.nameById = Object.create(null);
       cls.skills.forEach(function (s) { cls.nameById[s.id] = s.name; });
+      return { id: cls.id, name: cls.name, skills: cls.skills, cls: cls, facet: 'class', facetId: cls.id };
+    });
+    ITEM_SOURCES.forEach(function (src) {
+      var skills = DATA[src.dataKey];
+      if (skills && skills.length) {
+        list.push({ id: src.facetId, name: src.name, skills: skills, cls: null, facet: 'source', facetId: src.facetId });
+      }
+    });
+    return list;
+  }
 
+  function groupHidden(g) {
+    if (g.facet === 'class') return !!hiddenSources.mastery || !!hiddenClasses[g.facetId];
+    return !!hiddenSources[g.facetId];
+  }
+
+  function render() {
+    listEl.innerHTML = '';
+    cards = [];
+    groups = buildGroups();
+
+    groups.forEach(function (g) {
       var header = el('div', 'skill-list-group-header');
-      header.dataset.cls = cls.id;
-      header.appendChild(el('span', 'title', F.esc(cls.name)));
-      header.appendChild(el('span', 'count', cls.skills.length + ' skills'));
+      header.dataset.cls = g.id;
+      header.appendChild(el('span', 'title', F.esc(g.name)));
+      header.appendChild(el('span', 'count', g.skills.length + ' skills'));
       listEl.appendChild(header);
 
       var group = el('div', 'skill-list-group');
-      group.dataset.cls = cls.id;
-      cls.skills.forEach(function (skill) {
-        var entry = buildCard(skill, cls);
+      group.dataset.cls = g.id;
+      g.skills.forEach(function (skill) {
+        var entry = buildCard(skill, g.cls);
+        entry.group = g;
         group.appendChild(entry.el);
         cards.push(entry);
       });
@@ -310,9 +404,14 @@
     var q = searchEl.value.trim();
     var parts = [];
     if (q) parts.push('q=' + encodeURIComponent(q));
-    var shown = DATA.classes.filter(function (c) { return !hiddenClasses[c.id]; });
-    if (shown.length !== DATA.classes.length) {
-      parts.push('cls=' + shown.map(function (c) { return c.index; }).join(','));
+    var shownCls = DATA.classes.filter(function (c) { return !hiddenClasses[c.id]; });
+    if (shownCls.length !== DATA.classes.length) {
+      parts.push('cls=' + shownCls.map(function (c) { return c.index; }).join(','));
+    }
+    var allSources = sourceItems();
+    var shownSrc = allSources.filter(function (s) { return !hiddenSources[s.id]; });
+    if (shownSrc.length !== allSources.length) {
+      parts.push('src=' + shownSrc.map(function (s) { return s.id; }).join(','));
     }
     if (rankMode !== '1') parts.push('rank=' + rankMode);
     if (charLevel !== 100) parts.push('lv=' + charLevel);
@@ -325,9 +424,9 @@
     searchBlock.classList.toggle('has-text', q.length > 0);
     var terms = parseQuery(q);
 
-    var visibleByClass = Object.create(null);
+    var visibleByGroup = Object.create(null);
     cards.forEach(function (entry) {
-      var show = !hiddenClasses[entry.cls.id];
+      var show = !groupHidden(entry.group);
       if (show) {
         for (var i = 0; i < terms.length; i++) {
           var hit = entry.haystack.indexOf(terms[i].text) !== -1;
@@ -335,19 +434,19 @@
         }
       }
       entry.el.style.display = show ? '' : 'none';
-      if (show) visibleByClass[entry.cls.id] = (visibleByClass[entry.cls.id] || 0) + 1;
+      if (show) visibleByGroup[entry.group.id] = (visibleByGroup[entry.group.id] || 0) + 1;
     });
 
     var total = 0;
-    DATA.classes.forEach(function (cls) {
-      var n = visibleByClass[cls.id] || 0;
+    groups.forEach(function (g) {
+      var n = visibleByGroup[g.id] || 0;
       total += n;
-      var header = listEl.querySelector('.skill-list-group-header[data-cls="' + cls.id + '"]');
-      var group = listEl.querySelector('.skill-list-group[data-cls="' + cls.id + '"]');
+      var header = listEl.querySelector('.skill-list-group-header[data-cls="' + g.id + '"]');
+      var group = listEl.querySelector('.skill-list-group[data-cls="' + g.id + '"]');
       header.style.display = n ? '' : 'none';
       group.style.display = n ? '' : 'none';
       header.querySelector('.count').textContent =
-        n === cls.skills.length ? n + ' skills' : n + ' of ' + cls.skills.length + ' skills';
+        n === g.skills.length ? n + ' skills' : n + ' of ' + g.skills.length + ' skills';
     });
 
     document.getElementById('no-results').style.display = total ? 'none' : '';
@@ -355,39 +454,55 @@
 
   // ----------------------------------------------------------- selectors --
 
-  function buildClassSelector() {
+  // 'Masteries' plus one entry per non-mastery source that actually loaded
+  // data - so the source row only shows e.g. Relics once relics.json has
+  // content.
+  function sourceItems() {
+    var list = [{ id: 'mastery', name: 'Masteries' }];
+    ITEM_SOURCES.forEach(function (src) {
+      var skills = DATA[src.dataKey];
+      if (skills && skills.length) list.push({ id: src.facetId, name: src.name });
+    });
+    return list;
+  }
+
+  // Builds one tab per item, wired with the class-tab isolate/restore-all
+  // behavior: the first click on a fully-shown row isolates that tab, and
+  // clicking the last tab standing restores every tab - so the row can never
+  // be filtered down to nothing. Shared by the class selector and the source
+  // selector, which differ only in their item list, hidden-map and dataset key.
+  function buildTabStrip(container, items, hiddenMap, datasetKey, onChange) {
     var tabs = [];
 
     function syncTabs() {
       tabs.forEach(function (t) {
-        t.classList.toggle('selected', !hiddenClasses[t.dataset.cls]);
+        t.classList.toggle('selected', !hiddenMap[t.dataset[datasetKey]]);
       });
     }
 
-    DATA.classes.forEach(function (cls) {
-      var tab = el('div', 'tab selected', F.esc(cls.name));
-      tab.dataset.cls = cls.id;
+    items.forEach(function (item) {
+      var tab = el('div', 'tab selected', F.esc(item.name));
+      tab.dataset[datasetKey] = item.id;
       tab.addEventListener('click', function () {
-        var shown = DATA.classes.filter(function (c) { return !hiddenClasses[c.id]; });
-        var isOnly = shown.length === 1 && shown[0].id === cls.id;
+        var shown = items.filter(function (it) { return !hiddenMap[it.id]; });
+        var isOnly = shown.length === 1 && shown[0].id === item.id;
 
-        if (shown.length === DATA.classes.length) {
+        if (shown.length === items.length) {
           // Nothing is filtered yet, so the first click means "just this one"
           // rather than "all except this one".
-          DATA.classes.forEach(function (c) { hiddenClasses[c.id] = c.id !== cls.id; });
+          items.forEach(function (it) { hiddenMap[it.id] = it.id !== item.id; });
         } else if (isOnly) {
           // Clicking the last one standing goes back to everything, so the
           // isolate step is always one click from undone.
-          DATA.classes.forEach(function (c) { hiddenClasses[c.id] = false; });
+          items.forEach(function (it) { hiddenMap[it.id] = false; });
         } else {
-          hiddenClasses[cls.id] = !hiddenClasses[cls.id];
+          hiddenMap[item.id] = !hiddenMap[item.id];
         }
         syncTabs();
-        applyFilter();
-        syncUrl();
+        onChange();
       });
       tabs.push(tab);
-      classSelector.appendChild(tab);
+      container.appendChild(tab);
     });
 
     return syncTabs;
@@ -398,7 +513,11 @@
     Array.prototype.forEach.call(rankModeEl.children, function (t) {
       t.classList.toggle('selected', t.dataset.mode === mode);
     });
-    cards.forEach(function (entry) { entry.setRank(defaultRank(entry.skill)); });
+    // levelEq cards aren't governed by this toolbar at all - their rank
+    // tracks the char-level box exclusively (see bindCharLevel).
+    cards.forEach(function (entry) {
+      if (!entry.skill.levelEq) entry.setRank(defaultRank(entry.skill));
+    });
   }
 
   function bindRankMode() {
@@ -416,7 +535,14 @@
       if (!v || v < 1) return;                 // mid-edit, leave the cards alone
       charLevel = Math.min(v, 110);
       cards.forEach(function (entry) {
-        if (entry.petEl) entry.petEl.innerHTML = petHtml(entry.skill, entry.rank);
+        if (entry.skill.levelEq) {
+          // The rank itself moves with character level here (not just pet
+          // health/energy), so repaint the whole card, not just petEl.
+          entry.rank = levelEqRank(entry.skill);
+          paint(entry);
+        } else if (entry.petEl) {
+          entry.petEl.innerHTML = petHtml(entry.skill, entry.rank);
+        }
       });
       syncUrl();
     });
@@ -430,7 +556,17 @@
     return;
   }
 
-  var syncClassTabs = buildClassSelector();
+  // The class tabs only mean anything while Masteries itself is selected in
+  // the source row - hide the whole strip rather than leaving a row of tabs
+  // that no longer affect what's on screen.
+  function syncClassSelectorVisibility() {
+    classSelector.style.display = hiddenSources.mastery ? 'none' : '';
+  }
+
+  var syncClassTabs = buildTabStrip(classSelector, DATA.classes, hiddenClasses, 'cls',
+    function () { applyFilter(); syncUrl(); });
+  var syncSourceTabs = buildTabStrip(sourceSelector, sourceItems(), hiddenSources, 'src',
+    function () { syncClassSelectorVisibility(); applyFilter(); syncUrl(); });
   bindRankMode();
   bindCharLevel();
 
@@ -442,6 +578,16 @@
     });
     syncClassTabs();
   }
+
+  var initialSrc = /[?&]src=([\w,]+)/.exec(location.search);
+  if (initialSrc) {
+    var wantedSrc = initialSrc[1].split(',');
+    sourceItems().forEach(function (s) {
+      hiddenSources[s.id] = wantedSrc.indexOf(s.id) === -1;
+    });
+    syncSourceTabs();
+  }
+  syncClassSelectorVisibility();
 
   var initialLevel = /[?&]lv=(\d+)/.exec(location.search);
   if (initialLevel) {

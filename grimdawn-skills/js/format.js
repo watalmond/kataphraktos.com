@@ -259,7 +259,26 @@ window.GDFormat = (function () {
     ['defensiveSlowLifeLeach', 'DefenseLifeLeach'],
     ['defensiveSlowManaLeach', 'DefenseManaLeach'],
     ['defensiveAllMaxResist', 'DefenseAllMaxResist'],
+    ['defensiveAllResistance', 'DefenseAllResistance'],
+    ['defensiveSleep', 'tagDefenseSleep'],
+    ['defensivePhysicalMaxResist', 'DefensePhysicalMaxResist'],
+    ['defensivePierceMaxResist', 'DefensePierceMaxResist'],
+    ['defensiveColdMaxResist', 'DefenseColdMaxResist'],
+    ['defensiveFireMaxResist', 'DefenseFireMaxResist'],
+    ['defensiveAetherMaxResist', 'DefenseAetherMaxResist'],
+    ['defensiveChaosMaxResist', 'DefenseChaosMaxResist'],
+    ['defensivePoisonMaxResist', 'DefensePoisonMaxResist'],
+    ['defensiveLightningMaxResist', 'DefenseLightningMaxResist'],
+    ['defensiveLifeMaxResist', 'DefenseLifeMaxResist'],
+    ['defensiveStunMaxResist', 'DefenseStunMaxResist'],
+    ['defensiveSlowLifeLeachMaxResist', 'DefenseLifeLeachMaxResist'],
+    ['defensiveSlowManaLeachMaxResist', 'DefenseManaLeachMaxResist'],
+    ['defensiveTrapMaxResist', 'DefenseTrapMaxResist'],
+    ['defensiveFreezeMaxResist', 'DefenseFreezeMaxResist'],
+    ['defensivePetrifyMaxResist', 'DefensePetrifyMaxResist'],
+    ['defensiveBleedingMaxResist', 'DefenseBleedingMaxResist'],
     ['defensiveStun', 'DefenseStun'],
+    ['defensiveKnockdown', 'DefenseKnockdown'],
     ['defensiveFreeze', 'DefenseFreeze'],
     ['defensiveTrap', 'DefenseTrap'],
     ['defensivePetrify', 'DefensePetrify'],
@@ -275,7 +294,11 @@ window.GDFormat = (function () {
     ['defensivePercentCurrentLife', 'DefensePercentCurrentLife'],
     ['defensiveFireDuration', 'DefenseFireDuration'],
     ['defensivePoisonDuration', 'DefensePoisonDuration'],
-    ['defensiveBleedingDuration', 'DefenseBleedingDuration']
+    ['defensiveBleedingDuration', 'DefenseBleedingDuration'],
+    ['defensiveColdDuration', 'DefenseColdDuration'],
+    ['defensiveLifeDuration', 'DefenseLifeDuration'],
+    ['defensiveLightningDuration', 'DefenseLightningDuration'],
+    ['defensivePhysicalDuration', 'DefensePhysicalDuration']
   ];
 
   // A few fields the game formats in code rather than through a text tag.
@@ -351,6 +374,8 @@ window.GDFormat = (function () {
     if (on('damageAbsorptionPercent')) L.tag('SkillDamageAbsorptionPercent', [val('damageAbsorptionPercent')]);
     if (on('skillLifeBonus')) L.tag('SkillLifeBonus', [val('skillLifeBonus')]);
     if (on('skillLifePercent')) L.tag('SkillLifePercent', [val('skillLifePercent')]);
+    if (on('skillManaBonus')) L.tag('SkillManaBonus', [val('skillManaBonus')]);
+    if (on('skillManaPercent')) L.tag('SkillManaPercent', [val('skillManaPercent')]);
     if (on('skillManaCostReduction')) L.tag('SkillManaCostReduction', [val('skillManaCostReduction')]);
     if (on('skillCooldownReduction')) L.tag('SkillCooldownReduction', [val('skillCooldownReduction')]);
     if (on('skillTargetInterval')) L.tag('SkillSecondFormat', [val('skillTargetInterval'), stripCodes(tpl('Interval'))]);
@@ -511,6 +536,7 @@ window.GDFormat = (function () {
       }).join(', ');
       if (on('racialBonusPercentDamage')) L.tag('RacialBonusPercentDamage', [val('racialBonusPercentDamage'), races]);
       if (on('racialBonusPercentDefense')) L.tag('RacialBonusPercentDefense', [val('racialBonusPercentDefense'), races]);
+      if (on('racialBonusAbsoluteDamage')) L.tag('RacialBonusAbsoluteDamage', [val('racialBonusAbsoluteDamage'), races]);
     }
 
     // -- character ----------------------------------------------------------
@@ -617,7 +643,14 @@ window.GDFormat = (function () {
       m = /^[A-Za-z_][A-Za-z_0-9]*/.exec(s.slice(i));
       if (m) {
         i += m[0].length;
-        return m[0] === 'charLevel' ? charLevel : 0;
+        // Pet health/energy formulas spell it "charLevel"; itemSkillLevelEq
+        // (which rank of a relic/component/item/set's granted skill to show)
+        // spells the same idea "itemLevel" - despite the name, it evaluates
+        // against the wearer's character level, not the item's own static
+        // itemLevel field (confirmed by matching a live grimtools value
+        // exactly: itemLevel/4+1 at charLevel 100 lands on the rank grimtools
+        // shows). Both bind to the single value the caller passes in.
+        return /^(charLevel|itemLevel)$/i.test(m[0]) ? charLevel : 0;
       }
       i++;                       // skip anything unexpected rather than hang
       return 0;

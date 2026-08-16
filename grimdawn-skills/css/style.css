@@ -132,7 +132,7 @@ body {
 
 /* tab strips -------------------------------------------------------------- */
 
-.class-selector, .rank-mode {
+.class-selector, .source-selector, .rank-mode {
   display: flex;
   border: 1px solid var(--border-tab);
   border-radius: 2px;
@@ -140,9 +140,9 @@ body {
   cursor: pointer;
   user-select: none;
 }
-.class-selector { margin: 12px 12px; }
+.class-selector, .source-selector { margin: 12px 12px; }
 
-.class-selector .tab, .rank-mode .tab {
+.class-selector .tab, .source-selector .tab, .rank-mode .tab {
   padding: 6px 15px;
   background: #000;
   border-right: 1px solid var(--border-tab);
@@ -150,10 +150,10 @@ body {
   text-align: center;
   color: var(--text);
 }
-.class-selector .tab:last-child, .rank-mode .tab:last-child { border-right: 0; }
-.class-selector .tab:not(.selected), .rank-mode .tab:not(.selected) { color: #666; }
-.class-selector .tab.selected, .rank-mode .tab.selected { background: #191816; }
-.class-selector .tab:hover, .rank-mode .tab:hover { background: #0f0d0c; }
+.class-selector .tab:last-child, .source-selector .tab:last-child, .rank-mode .tab:last-child { border-right: 0; }
+.class-selector .tab:not(.selected), .source-selector .tab:not(.selected), .rank-mode .tab:not(.selected) { color: #666; }
+.class-selector .tab.selected, .source-selector .tab.selected, .rank-mode .tab.selected { background: #191816; }
+.class-selector .tab:hover, .source-selector .tab:hover, .rank-mode .tab:hover { background: #0f0d0c; }
 .rank-mode .tab { padding: 4px 12px; font-size: 15px; }
 
 /* ------------------------------------------------------------- skill list -- */
@@ -217,6 +217,11 @@ body {
 }
 .skill-subtitle { color: var(--text-heading); font-size: 14px; padding-top: 1px; }
 .skill-subtitle .skill-ref { color: var(--text-skill); }
+.skill-subtitle a.skill-ref {
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+.skill-subtitle a.skill-ref:hover { text-decoration-style: solid; }
 .skill-req { color: var(--text-dim); font-size: 14px; padding-top: 2px; }
 
 /* rank stepper ------------------------------------------------------------ */
