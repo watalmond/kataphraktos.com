@@ -329,8 +329,37 @@ body {
 /* ------------------------------------------------------------------ small -- */
 
 @media (max-width: 800px) {
+  /* Char level and the rank selector used to just display:none here, which
+     silently hid controls that change what numbers are on screen. Wrap them
+     onto a second row instead - the secondary bar's sticky offset is kept in
+     sync with the now-variable primary bar height in app.js. */
   .top-bar { gap: 8px; }
-  .top-bar .bar-right { display: none; }
+  .top-bar:not(.secondary) { height: auto; min-height: 48px; flex-wrap: wrap; row-gap: 8px; padding: 8px 12px; }
+  .top-bar .bar-mid { flex: 1 1 100%; }
+  .top-bar .bar-right { flex: 1 1 100%; justify-content: space-between; }
+
+  /* Ten class tabs plus the source tabs are wider than a narrow window - let
+     both strips wrap onto as many rows as they need instead of running off
+     the right edge, and let the secondary bar grow to fit them. */
+  .top-bar.secondary { height: auto; flex-wrap: wrap; padding: 8px 12px; row-gap: 16px; }
+  /* A single outer border/box-shadow around a wrapped flex row leaves the
+     unfilled tail of each line looking like a blank rectangle (the border
+     traces the whole box, not the tabs actually in it). Drop the box border
+     and give each tab its own instead, so wrapped rows read as a cluster of
+     chips with no dead space, rather than a box with gaps in it. Margin
+     reset to 0 because flex-basis 100% is sized against the container and
+     doesn't itself leave room for the old side margins - they'd overflow. */
+  .top-bar.secondary .class-selector,
+  .top-bar.secondary .source-selector {
+    flex-wrap: wrap; flex: 1 1 100%; margin: 0;
+    border: 0; box-shadow: none;
+    row-gap: 6px; column-gap: 6px;
+  }
+  .top-bar.secondary .class-selector .tab,
+  .top-bar.secondary .source-selector .tab {
+    border: 1px solid var(--border-tab);
+    border-radius: 2px;
+  }
   .skill-card { width: 100%; margin: 6px 0; }
   .skill-list-group { padding: 8px 12px; }
   .skill-list-group-header { margin: 12px 12px 0; }

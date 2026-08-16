@@ -18,6 +18,8 @@
   var sourceSelector = document.getElementById('source-selector');
   var rankModeEl = document.getElementById('rank-mode');
   var charLevelEl = document.getElementById('char-level');
+  var primaryBar = document.querySelector('.top-bar:not(.secondary)');
+  var secondaryBar = document.querySelector('.top-bar.secondary');
 
   // A buff in the game's sense is one it keeps running for you - the skills
   // whose tooltip ends in "Buffs are automatically activated". Those are the
@@ -556,17 +558,32 @@
     return;
   }
 
-  // The class tabs only mean anything while Masteries itself is selected in
-  // the source row - hide the whole strip rather than leaving a row of tabs
-  // that no longer affect what's on screen.
-  function syncClassSelectorVisibility() {
-    classSelector.style.display = hiddenSources.mastery ? 'none' : '';
+  // The class tabs and the Rank 1/Max/Ultimate stepper both only mean
+  // anything while Masteries itself is selected in the source row - relic/
+  // component/item/set cards have no player-chosen rank (see levelEqRank) -
+  // so hide both rather than leaving controls that no longer affect what's
+  // on screen.
+  function syncMasteryOnlyVisibility() {
+    var show = !hiddenSources.mastery;
+    classSelector.style.display = show ? '' : 'none';
+    rankModeEl.style.display = show ? '' : 'none';
+    syncStickyOffset();
   }
+
+  // The secondary bar's sticky offset has to equal the primary bar's actual
+  // height, or it either leaves a gap or slides underneath it. That height
+  // is fixed on wide screens but wraps to two rows below 800px (char level
+  // and the rank selector used to just be display:none there instead), so
+  // it's measured rather than hardcoded, and re-measured on resize/rotation.
+  function syncStickyOffset() {
+    secondaryBar.style.top = primaryBar.offsetHeight + 'px';
+  }
+  window.addEventListener('resize', syncStickyOffset);
 
   var syncClassTabs = buildTabStrip(classSelector, DATA.classes, hiddenClasses, 'cls',
     function () { applyFilter(); syncUrl(); });
   var syncSourceTabs = buildTabStrip(sourceSelector, sourceItems(), hiddenSources, 'src',
-    function () { syncClassSelectorVisibility(); applyFilter(); syncUrl(); });
+    function () { syncMasteryOnlyVisibility(); applyFilter(); syncUrl(); });
   bindRankMode();
   bindCharLevel();
 
@@ -587,7 +604,7 @@
     });
     syncSourceTabs();
   }
-  syncClassSelectorVisibility();
+  syncMasteryOnlyVisibility();
 
   var initialLevel = /[?&]lv=(\d+)/.exec(location.search);
   if (initialLevel) {
@@ -602,6 +619,7 @@
   var initial = /[?&]q=([^&]*)/.exec(location.search);
   if (initial) searchEl.value = decodeURIComponent(initial[1].replace(/\+/g, ' '));
   applyFilter();
+  syncStickyOffset();
 
   var timer = null;
   searchEl.addEventListener('input', function () {
